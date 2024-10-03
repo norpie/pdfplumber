@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](http://keepachangelog.com/).
 
+## [0.11.5] - 2024-10-02
+
+### Added
+
+- Add `name` property to `image` objects (h/t @djr2015). ([#1201](https://github.com/jsvine/pdfplumber/discussions/1201))
+
+
 ## [0.11.4] - 2024-08-18
 
 ### Fixed

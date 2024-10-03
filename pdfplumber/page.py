@@ -64,6 +64,7 @@ ALL_ATTRS = set(
         "stroke",
         "stroking_color",
         "stream",
+        "name",
         "mcid",
         "tag",
     ]
