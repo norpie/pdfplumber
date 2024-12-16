@@ -292,6 +292,23 @@ class Test(unittest.TestCase):
 
         assert res.decode("utf-8").split("\r\n")[9] == ("char,1")
 
+    def test_cli_text(self):
+        path = os.path.join(HERE, "pdfs/scotus-transcript-p1.pdf")
+        res = run(
+            [
+                sys.executable,
+                "-m",
+                "pdfplumber.cli",
+                path,
+                "--format",
+                "text",
+            ]
+        )
+
+        target_path = os.path.join(HERE, "comparisons/scotus-transcript-p1.txt")
+        target = open(target_path).read()
+        assert res.decode("utf-8") == target
+
     def test_page_to_dict(self):
         x = self.pdf.pages[0].to_dict(object_types=["char"])
         assert len(x["chars"]) == len(self.pdf.pages[0].chars)
