@@ -55,6 +55,9 @@ class Test(unittest.TestCase):
 
         self.im.debug_tablefinder(None)
 
+        # https://github.com/jsvine/pdfplumber/issues/1237
+        self.im.debug_tablefinder(table_settings={})
+
         with pytest.raises(ValueError):
             self.im.debug_tablefinder(0)
 
