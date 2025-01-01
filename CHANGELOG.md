@@ -2,11 +2,17 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](http://keepachangelog.com/).
 
-## [0.11.5] - 2024-10-02
+## [0.11.5] - 2025-01-01
 
 ### Added
 
+- Add `--format text` options to CLI (in addition to previously-available `csv` and `json`) (h/t @brandonrobertz). ([#1235](https://github.com/jsvine/pdfplumber/pull/1235))
+- Add `raise_unicode_errors: bool` parameter to `pdfplumber.open()` to allow bypassing `UnicodeDecodeError`s in annotation-parsing and generate warnings instead (h/t @stolarczyk). ([#1195](https://github.com/jsvine/pdfplumber/issues/1195))
 - Add `name` property to `image` objects (h/t @djr2015). ([#1201](https://github.com/jsvine/pdfplumber/discussions/1201))
+
+### Fixed
+
+- Fix `PageImage.debug_tablefinder(...)` so that its main keyword argument is named the same (`table_settings=`) as other related `Page` methods (h/t @n-traore). ([#1237](https://github.com/jsvine/pdfplumber/issues/1237))
 
 
 ## [0.11.4] - 2024-08-18
