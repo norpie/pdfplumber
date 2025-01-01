@@ -568,6 +568,7 @@ Many thanks to the following users who've contributed ideas, features, and fixes
 - [Quentin André](https://github.com/QuentinAndre11)
 - [Léo Roux](https://github.com/leorouxx)
 - [@wodny](https://github.com/wodny)
+- [Michal Stolarczyk](https://github.com/stolarczyk)
 - [Brandon Roberts](https://github.com/brandonrobertz)
 
 ## Contributing
