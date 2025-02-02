@@ -285,10 +285,11 @@ class Test(unittest.TestCase):
 
     def test_issue_1089(self):
         """
-        Page.to_image() leaks file descriptors
+        Page.to_image() binds file descriptors.
 
-        This is because PyPdfium2 leaks file descriptors.  Explicitly
-        close the `PdfDocument` to prevent this.
+        This is because pypdfium2 binds file descriptors, and garbage collection may
+        be too lazy. Explicitly close the `PdfDocument` to prevent running out of file
+        descriptors.
         """
         # Skip test on platforms without getrlimit
         if resource is None:
