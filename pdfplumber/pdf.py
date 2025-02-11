@@ -10,7 +10,6 @@ from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
-from pdfminer.psparser import PSException
 
 from ._typing import T_num, T_obj_list
 from .container import Container
@@ -117,7 +116,7 @@ class PDF(Container):
                 raise_unicode_errors=raise_unicode_errors,
             )
 
-        except PSException:
+        except PdfminerException:
             if not stream_is_external:
                 stream.close()
             raise
