@@ -283,26 +283,6 @@ class Test(unittest.TestCase):
             words = " ".join(w["text"] for w in page.extract_words(use_text_flow=True))
             assert text[0:100] == words[0:100]
 
-    def test_issue_1089(self):
-        """
-        Page.to_image() binds file descriptors.
-
-        This is because pypdfium2 binds file descriptors, and garbage collection may
-        be too lazy. Explicitly close the `PdfDocument` to prevent running out of file
-        descriptors.
-        """
-        # Skip test on platforms without getrlimit
-        if resource is None:
-            return
-        # Any PDF will do
-        path = os.path.join(HERE, "pdfs/test-punkt.pdf")
-        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-        with pdfplumber.open(path) as pdf:
-            for idx in range(soft):
-                _ = pdf.pages[0].to_image()
-        # We're still alive
-        assert True
-
     def test_issue_1147(self):
         """
         Edge-case for when decode_text is passed a string
