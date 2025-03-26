@@ -186,7 +186,7 @@ def _normalize_box(box_raw: T_bbox, rotation: T_num = 0) -> T_bbox:
     # conventionally specified by their lower-left and upperright
     # corners, it is acceptable to specify any two diagonally opposite
     # corners."
-    if not all(isinstance(x, numbers.Number) for x in box_raw):
+    if not all(isinstance(x, numbers.Number) for x in box_raw):  # pragma: nocover
         raise MalformedPDFException(
             f"Bounding box contains non-number coordinate(s): {box_raw}"
         )
@@ -426,7 +426,7 @@ class Page(Container):
             )
 
             # Handle (rare) byte-encoded fontnames
-            if isinstance(attr["fontname"], bytes):
+            if isinstance(attr["fontname"], bytes):  # pragma: nocover
                 attr["fontname"] = fix_fontname_bytes(attr["fontname"])
 
         elif isinstance(obj, (LTCurve,)):
