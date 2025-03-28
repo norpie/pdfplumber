@@ -348,10 +348,7 @@ class Page(Container):
             parsed["data"] = annot
             return parsed
 
-        try:
-            raw = resolve_all(self.page_obj.annots) or []
-        except RecursionError:
-            raise MalformedPDFException("Annotations are infinitely recursive.")
+        raw = resolve_all(self.page_obj.annots) or []
         parsed = list(map(parse, raw))
         if isinstance(self, CroppedPage):
             return self._crop_fn(parsed)
