@@ -336,6 +336,19 @@ class Test(unittest.TestCase):
             re.search("2015 RICE PAYMENT 26406576 0 1207631 Cr", not_using_flow) is None
         )
 
+    def test_text_flow_words_mixed_lines(self):
+        path = os.path.join(HERE, "pdfs/issue-1279-example.pdf")
+
+        with pdfplumber.open(path) as pdf:
+            p0 = pdf.pages[0]
+            words = p0.extract_words(use_text_flow=True)
+
+        texts = set(w["text"] for w in words)
+
+        assert "claim" in texts
+        assert "lence" in texts
+        assert "claimlence" not in texts
+
     def test_extract_text(self):
         text = self.pdf.pages[0].extract_text()
         goal_lines = [
