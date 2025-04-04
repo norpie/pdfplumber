@@ -772,11 +772,11 @@ def extract_text(
 
         # Modify how lines and words are joined based on preserve_spaces
         if preserve_spaces:
-            # Create a function to maintain spaces in the text
-            def join_with_spaces(line: T_obj_list) -> str:
+            # Calculate appropriate spacing between words based on their positions
+            def join_with_proportional_spaces(line: T_obj_list) -> str:
                 if not line:
                     return ""
-                    
+                
                 sorted_words = sorted(line, key=lambda w: w["x0"])
                 result_parts = []
                 
@@ -787,15 +787,30 @@ def extract_text(
                         gap = word["x0"] - prev_word["x1"]
                         
                         # Add appropriate number of spaces based on gap size
-                        # We can adjust this formula based on testing
-                        space_count = max(1, int(gap / (x_tolerance * 1.5)))
-                        result_parts.append(" " * space_count)
+                        # Using average character width to determine space count
+                        avg_char_width = 0
+                        char_count = 0
                         
+                        # Calculate average character width from nearby words
+                        for w in [prev_word, word]:
+                            if w["width"] > 0 and len(w["text"]) > 0:
+                                avg_char_width += w["width"] / len(w["text"])
+                                char_count += 1
+                        
+                        if char_count > 0:
+                            avg_char_width /= char_count
+                            # If no valid width found, use x_tolerance as a fallback
+                            space_count = max(1, int(gap / (avg_char_width or x_tolerance)))
+                        else:
+                            space_count = max(1, int(gap / x_tolerance))
+                            
+                        result_parts.append(" " * space_count)
+                    
                     result_parts.append(word["text"])
                 
                 return "".join(result_parts)
                 
-            text = "\n".join(join_with_spaces(line) for line in lines)
+            text = "\n".join(join_with_proportional_spaces(line) for line in lines)
         else:
             # Original behavior - single space between words
             text = "\n".join(" ".join(word["text"] for word in line) for line in lines)

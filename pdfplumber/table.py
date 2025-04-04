@@ -446,16 +446,18 @@ class Table(object):
                     ]
 
                     if len(cell_chars):
-                        if "layout" in kwargs:
+                        # When preserve_spaces is True, always set layout=True
+                        # to better preserve spacing
+                        if preserve_spaces and "layout" not in kwargs:
+                            kwargs["layout"] = True
+                            
+                        # Always set layout parameters when using layout
+                        if kwargs.get("layout") or preserve_spaces:
                             kwargs["layout_width"] = cell[2] - cell[0]
                             kwargs["layout_height"] = cell[3] - cell[1]
                             kwargs["layout_bbox"] = cell
                     
-                        # When preserve_spaces is True, also set layout=True to better preserve spacing
-                        if preserve_spaces and "layout" not in kwargs:
-                            kwargs["layout"] = True
-                    
-                        # Pass preserve_spaces to extract_text and ensure it's honored
+                        # Pass preserve_spaces to extract_text to preserve all whitespace
                         cell_text = utils.extract_text(
                             cell_chars, 
                             preserve_spaces=preserve_spaces,
