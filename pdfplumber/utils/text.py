@@ -743,12 +743,6 @@ def extract_text(
     if "preserve_spaces" not in kwargs:
         kwargs["preserve_spaces"] = preserve_spaces
 
-    # For backwards compatibility - strip_whitespaces is the inverse of preserve_spaces
-    if "strip_whitespaces" not in kwargs:
-        # We don't need to pass this as WordExtractor now only uses preserve_spaces
-        # But keeping for any code that might expect it
-        kwargs["strip_whitespaces"] = not preserve_spaces
-
     if kwargs.get("layout"):
         textmap_kwargs = {
             **kwargs,

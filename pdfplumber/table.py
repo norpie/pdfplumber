@@ -419,13 +419,8 @@ class Table(object):
         return self._get_rows_or_cols(Column)
 
     def extract(self, **kwargs: Any) -> List[List[Optional[str]]]:
-        # Consolidate to single parameter - preserve_spaces
+        # Get preserve_spaces setting (defaults to False)
         preserve_spaces = kwargs.pop("preserve_spaces", False)
-        
-        # For backwards compatibility
-        if "strip_whitespaces" in kwargs:
-            # If explicitly set, use it (inverse of preserve_spaces)
-            preserve_spaces = not kwargs.pop("strip_whitespaces")
         
         chars = self.page.chars
         table_arr = []
@@ -511,7 +506,7 @@ class TableSettings:
     intersection_tolerance: T_num = 3
     intersection_x_tolerance: T_num = UNSET
     intersection_y_tolerance: T_num = UNSET
-    preserve_spaces: bool = False  # Consolidated parameter - preserves all whitespace when True
+    preserve_spaces: bool = False  # Preserves all whitespace when True
     text_settings: Optional[Dict[str, Any]] = None
 
     def __post_init__(self) -> None:
@@ -574,17 +569,12 @@ class TableSettings:
         elif isinstance(settings, dict):
             core_settings = {}
             text_settings = {}
-            
-            # Handle consolidation from older code
             preserve_spaces = settings.get("preserve_spaces", False)
-            if "strip_whitespaces" in settings:
-                # Override preserve_spaces with inverse of strip_whitespaces if present
-                preserve_spaces = not settings.get("strip_whitespaces")
             
             for k, v in settings.items():
                 if k[:5] == "text_":
                     text_settings[k[5:]] = v
-                elif k not in ("preserve_spaces", "strip_whitespaces"):  # Skip both for now
+                elif k != "preserve_spaces":  # Only skip preserve_spaces
                     core_settings[k] = v
                     
             core_settings["text_settings"] = text_settings
