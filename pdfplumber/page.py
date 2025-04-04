@@ -511,12 +511,9 @@ class Page(Container):
         tset = TableSettings.resolve(table_settings)
         tables = self.find_tables(tset)
         
-        # Ensure strip_whitespaces is passed to extract if present in table_settings
+        # Prepare extract parameters including strip_whitespaces from settings
         extract_params = tset.text_settings or {}
-        if isinstance(table_settings, dict) and "strip_whitespaces" in table_settings:
-            if extract_params is None:
-                extract_params = {}
-            extract_params["strip_whitespaces"] = table_settings["strip_whitespaces"]
+        extract_params["strip_whitespaces"] = tset.strip_whitespaces
             
         return [table.extract(**extract_params) for table in tables]
 
@@ -529,12 +526,9 @@ class Page(Container):
         if table is None:
             return None
         else:
-            # Ensure strip_whitespaces is passed to extract if present in table_settings
+            # Prepare extract parameters including strip_whitespaces from settings
             extract_params = tset.text_settings or {}
-            if isinstance(table_settings, dict) and "strip_whitespaces" in table_settings:
-                if extract_params is None:
-                    extract_params = {}
-                extract_params["strip_whitespaces"] = table_settings["strip_whitespaces"]
+            extract_params["strip_whitespaces"] = tset.strip_whitespaces
                 
             return table.extract(**extract_params)
 

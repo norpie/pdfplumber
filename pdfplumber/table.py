@@ -419,9 +419,9 @@ class Table(object):
         return self._get_rows_or_cols(Column)
 
     def extract(self, **kwargs: Any) -> List[List[Optional[str]]]:
-        # Set default for strip_whitespaces if not provided
-        strip_whitespaces = kwargs.pop("strip_whitespaces", True)
-
+        # Get strip_whitespaces from kwargs or from settings
+        strip_whitespaces = kwargs.pop("strip_whitespaces", self.page.settings.strip_whitespaces)
+        
         chars = self.page.chars
         table_arr = []
 
@@ -505,6 +505,7 @@ class TableSettings:
     intersection_tolerance: T_num = 3
     intersection_x_tolerance: T_num = UNSET
     intersection_y_tolerance: T_num = UNSET
+    strip_whitespaces: bool = True
     text_settings: Optional[Dict[str, Any]] = None
 
     def __post_init__(self) -> None:
@@ -570,6 +571,9 @@ class TableSettings:
             for k, v in settings.items():
                 if k[:5] == "text_":
                     text_settings[k[5:]] = v
+                elif k == "strip_whitespaces":
+                    # Handle strip_whitespaces specially
+                    core_settings["strip_whitespaces"] = v
                 else:
                     core_settings[k] = v
             core_settings["text_settings"] = text_settings
