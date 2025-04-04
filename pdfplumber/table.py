@@ -422,6 +422,10 @@ class Table(object):
         # Get strip_whitespaces value and remove it from kwargs so it's not passed twice
         strip_whitespaces = kwargs.pop("strip_whitespaces", True)
         
+        # Get preserve_spaces parameter (default False unless strip_whitespaces is False)
+        # This makes preserve_spaces the inverse of strip_whitespaces by default
+        preserve_spaces = kwargs.pop("preserve_spaces", not strip_whitespaces)
+        
         chars = self.page.chars
         table_arr = []
 
@@ -450,13 +454,13 @@ class Table(object):
                             kwargs["layout_width"] = cell[2] - cell[0]
                             kwargs["layout_height"] = cell[3] - cell[1]
                             kwargs["layout_bbox"] = cell
-                        # Pass strip_whitespaces to extract_text
+                        # Pass both parameters to extract_text
                         cell_text = utils.extract_text(
                             cell_chars, 
                             strip_whitespaces=strip_whitespaces,
+                            preserve_spaces=preserve_spaces,
                             **kwargs
                         )
-                        # No need for explicit stripping here as it's now handled by extract_text/WordExtractor
                     else:
                         cell_text = ""
                 arr.append(cell_text)
@@ -508,6 +512,7 @@ class TableSettings:
     intersection_x_tolerance: T_num = UNSET
     intersection_y_tolerance: T_num = UNSET
     strip_whitespaces: bool = True
+    preserve_spaces: bool = False  # Add preserve_spaces parameter
     text_settings: Optional[Dict[str, Any]] = None
 
     def __post_init__(self) -> None:
@@ -571,15 +576,17 @@ class TableSettings:
             core_settings = {}
             text_settings = {}
             strip_whitespaces = settings.get("strip_whitespaces", True)
+            preserve_spaces = settings.get("preserve_spaces", False)  # Add this
             
             for k, v in settings.items():
                 if k[:5] == "text_":
                     text_settings[k[5:]] = v
-                elif k != "strip_whitespaces":  # Skip strip_whitespaces for now
+                elif k not in ("strip_whitespaces", "preserve_spaces"):  # Update this
                     core_settings[k] = v
                     
             core_settings["text_settings"] = text_settings
             core_settings["strip_whitespaces"] = strip_whitespaces
+            core_settings["preserve_spaces"] = preserve_spaces  # Add this
             return cls(**core_settings)
         else:
             raise ValueError(f"Cannot resolve settings: {settings}")

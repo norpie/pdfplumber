@@ -438,7 +438,8 @@ class WordExtractor:
         extra_attrs: Optional[List[str]] = None,
         split_at_punctuation: Union[bool, str] = False,
         expand_ligatures: bool = True,
-        strip_whitespaces: bool = True,  # Add strip_whitespaces parameter
+        strip_whitespaces: bool = True,
+        preserve_spaces: bool = False,  # Add parameter to control space preservation
     ):
         self.x_tolerance = x_tolerance
         self.y_tolerance = y_tolerance
@@ -476,6 +477,7 @@ class WordExtractor:
 
         self.expansions = LIGATURES if expand_ligatures else {}
         self.strip_whitespaces = strip_whitespaces
+        self.preserve_spaces = preserve_spaces
 
     def get_char_dir(self, upright: int) -> T_dir:
         # Note: This can be simplified and reincorporated into .merge_chars and
@@ -733,6 +735,7 @@ def extract_text(
     line_dir_render: Optional[T_dir] = None,
     char_dir_render: Optional[T_dir] = None,
     strip_whitespaces: bool = True,
+    preserve_spaces: bool = False,  # Add parameter to control space preservation
     **kwargs: Any,
 ) -> str:
     chars = to_list(chars)
@@ -742,6 +745,10 @@ def extract_text(
     # Always include strip_whitespaces in kwargs to pass to WordExtractor
     if "strip_whitespaces" not in kwargs:
         kwargs["strip_whitespaces"] = strip_whitespaces
+        
+    # Add preserve_spaces to kwargs if not already present
+    if "preserve_spaces" not in kwargs:
+        kwargs["preserve_spaces"] = preserve_spaces
 
     if kwargs.get("layout"):
         textmap_kwargs = {
@@ -769,13 +776,38 @@ def extract_text(
             y_tolerance if line_dir_render in ("ttb", "btt") else x_tolerance,
         )
 
+        # Modify how lines and words are joined based on preserve_spaces
+        if preserve_spaces:
+            # Create a function to maintain spaces in the text
+            def join_with_spaces(line: T_obj_list) -> str:
+                if not line:
+                    return ""
+                    
+                sorted_words = sorted(line, key=lambda w: w["x0"])
+                result_parts = []
+                
+                for i, word in enumerate(sorted_words):
+                    if i > 0:
+                        # Calculate the gap between this word and the previous one
+                        prev_word = sorted_words[i-1]
+                        gap = word["x0"] - prev_word["x1"]
+                        
+                        # Add appropriate number of spaces based on gap size
+                        # We can adjust this formula based on testing
+                        space_count = max(1, int(gap / (x_tolerance * 1.5)))
+                        result_parts.append(" " * space_count)
+                        
+                    result_parts.append(word["text"])
+                
+                return "".join(result_parts)
+                
+            text = "\n".join(join_with_spaces(line) for line in lines)
+        else:
+            # Original behavior - single space between words
+            text = "\n".join(" ".join(word["text"] for word in line) for line in lines)
+            
         result = TextMap(
-            [
-                (char, None)
-                for char in (
-                    "\n".join(" ".join(word["text"] for word in line) for line in lines)
-                )
-            ],
+            [(char, None) for char in text],
             line_dir_render=line_dir_render,
             char_dir_render=char_dir_render,
         ).as_string
