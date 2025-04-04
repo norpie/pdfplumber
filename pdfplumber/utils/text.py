@@ -813,8 +813,8 @@ def extract_text(
             char_dir_render=char_dir_render,
         ).as_string
     
-    # Do final stripping only if preserve_spaces is False and strip_whitespaces is True
-    # This ensures we don't strip leading/trailing spaces at the text level
+    # Don't strip when preserve_spaces=True OR when strip_whitespaces=False
+    # This ensures we respect both parameters independently
     if strip_whitespaces and not preserve_spaces:
         result = result.strip()
     
