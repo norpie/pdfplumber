@@ -724,6 +724,7 @@ def extract_text(
     chars: T_obj_list,
     line_dir_render: Optional[T_dir] = None,
     char_dir_render: Optional[T_dir] = None,
+    strip_whitespaces: bool = True,  # Adding the strip_whitespaces parameter
     **kwargs: Any,
 ) -> str:
     chars = to_list(chars)
@@ -735,7 +736,7 @@ def extract_text(
             **kwargs,
             **{"line_dir_render": line_dir_render, "char_dir_render": char_dir_render},
         }
-        return chars_to_textmap(chars, **textmap_kwargs).as_string
+        result = chars_to_textmap(chars, **textmap_kwargs).as_string
     else:
         extractor = WordExtractor(
             **{k: kwargs[k] for k in WORD_EXTRACTOR_KWARGS if k in kwargs}
@@ -756,7 +757,7 @@ def extract_text(
             y_tolerance if line_dir_render in ("ttb", "btt") else x_tolerance,
         )
 
-        return TextMap(
+        result = TextMap(
             [
                 (char, None)
                 for char in (
@@ -766,6 +767,12 @@ def extract_text(
             line_dir_render=line_dir_render,
             char_dir_render=char_dir_render,
         ).as_string
+        
+    # Apply stripping if requested
+    if strip_whitespaces:
+        result = result.strip()
+        
+    return result
 
 
 def collate_line(
