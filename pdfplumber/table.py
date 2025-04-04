@@ -568,12 +568,16 @@ class TableSettings:
         elif isinstance(settings, dict):
             core_settings = {}
             text_settings = {}
+            strip_whitespaces = settings.get("strip_whitespaces", True)
+            
             for k, v in settings.items():
                 if k[:5] == "text_":
                     text_settings[k[5:]] = v
-                else:
+                elif k != "strip_whitespaces":  # Skip strip_whitespaces for now
                     core_settings[k] = v
+                    
             core_settings["text_settings"] = text_settings
+            core_settings["strip_whitespaces"] = strip_whitespaces
             return cls(**core_settings)
         else:
             raise ValueError(f"Cannot resolve settings: {settings}")
