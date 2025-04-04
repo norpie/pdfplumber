@@ -438,8 +438,7 @@ class WordExtractor:
         extra_attrs: Optional[List[str]] = None,
         split_at_punctuation: Union[bool, str] = False,
         expand_ligatures: bool = True,
-        strip_whitespaces: bool = True,
-        preserve_spaces: bool = False,
+        preserve_spaces: bool = False,  # Consolidated parameter - preserves all whitespace when True
     ):
         self.x_tolerance = x_tolerance
         self.y_tolerance = y_tolerance
@@ -476,7 +475,6 @@ class WordExtractor:
         )
 
         self.expansions = LIGATURES if expand_ligatures else {}
-        self.strip_whitespaces = strip_whitespaces
         self.preserve_spaces = preserve_spaces
 
     def get_char_dir(self, upright: int) -> T_dir:
@@ -502,8 +500,7 @@ class WordExtractor:
         )
         
         # Only strip if preserve_spaces is False
-        # This ensures we don't strip leading/trailing spaces when preserve_spaces is True
-        if self.strip_whitespaces and not self.preserve_spaces:
+        if not self.preserve_spaces:
             word_text = word_text.strip()
 
         word = {
@@ -735,21 +732,22 @@ def extract_text(
     chars: T_obj_list,
     line_dir_render: Optional[T_dir] = None,
     char_dir_render: Optional[T_dir] = None,
-    strip_whitespaces: bool = True,
-    preserve_spaces: bool = False,
+    preserve_spaces: bool = False,  # Consolidated parameter
     **kwargs: Any,
 ) -> str:
     chars = to_list(chars)
     if len(chars) == 0:
         return ""
 
-    # Always include strip_whitespaces in kwargs to pass to WordExtractor
-    if "strip_whitespaces" not in kwargs:
-        kwargs["strip_whitespaces"] = strip_whitespaces
-        
-    # Add preserve_spaces to kwargs if not already present
+    # Update kwargs with preserve_spaces
     if "preserve_spaces" not in kwargs:
         kwargs["preserve_spaces"] = preserve_spaces
+
+    # For backwards compatibility - strip_whitespaces is the inverse of preserve_spaces
+    if "strip_whitespaces" not in kwargs:
+        # We don't need to pass this as WordExtractor now only uses preserve_spaces
+        # But keeping for any code that might expect it
+        kwargs["strip_whitespaces"] = not preserve_spaces
 
     if kwargs.get("layout"):
         textmap_kwargs = {
@@ -813,9 +811,8 @@ def extract_text(
             char_dir_render=char_dir_render,
         ).as_string
     
-    # Don't strip when preserve_spaces=True OR when strip_whitespaces=False
-    # This ensures we respect both parameters independently
-    if strip_whitespaces and not preserve_spaces:
+    # Only strip final result if preserve_spaces is False
+    if not preserve_spaces:
         result = result.strip()
     
     return result
