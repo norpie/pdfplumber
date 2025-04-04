@@ -6,9 +6,11 @@ Plumb a PDF for detailed information about each text character, rectangle, and l
 
 Works best on machine-generated, rather than scanned, PDFs. Built on [`pdfminer.six`](https://github.com/goulu/pdfminer). 
 
-Currently [tested](tests/) on [Python 3.6, 3.7, and 3.8](.github/workflows/tests.yml).
+Currently [tested](tests/) on [Python 3.8, 3.9, 3.10, 3.11](.github/workflows/tests.yml).
 
-**Note:** `pdfplumber` v0.5.22 was the final version to support Python 3.5.
+Translations of this document are available in: [Chinese (by @hbh112233abc)](https://github.com/hbh112233abc/pdfplumber/blob/stable/README-CN.md).
+
+__To report a bug__ or request a feature, please [file an issue](https://github.com/jsvine/pdfplumber/issues/new/choose). __To ask a question__ or request assistance with a specific PDF, please [use the discussions forum](https://github.com/jsvine/pdfplumber/discussions).
 
 ## Table of Contents
 
@@ -16,6 +18,7 @@ Currently [tested](tests/) on [Python 3.6, 3.7, and 3.8](.github/workflows/tests
 - [Command line interface](#command-line-interface)
 - [Python library](#python-library)
 - [Visual debugging](#visual-debugging)
+- [Extracting text](#extracting-text)
 - [Extracting tables](#extracting-tables)
 - [Extracting form values](#extracting-form-values)
 - [Demonstrations](#demonstrations)
@@ -44,9 +47,11 @@ The output will be a CSV containing info about every character, line, and rectan
 
 | Argument | Description |
 |----------|-------------|
-|`--format [format]`| `csv` or `json`. The `json` format returns more information; it includes PDF-level and page-level metadata, plus dictionary-nested attributes.|
+|`--format [format]`| `csv`, `json`, or `text`. The `csv` and `json` formats return information about each object. Of those two, the `json` format returns more information; it includes PDF-level and page-level metadata, plus dictionary-nested attributes. The `text` option returns a plain-text representation of the PDF, using `Page.extract_text(layout=True)`.|
 |`--pages [list of pages]`| A space-delimited, `1`-indexed list of pages or hyphenated page ranges. E.g., `1, 11-15`, which would return data for pages 1, 11, 12, 13, 14, and 15.|
-|`--types [list of object types to extract]`| Choices are `char`, `rect`, `line`, `curve`, `image`, `annot`. Defaults to all.|
+|`--types [list of object types to extract]`| Choices are `char`, `rect`, `line`, `curve`, `image`, `annot`, et cetera. Defaults to all available.|
+|`--laparams`| A JSON-formatted string (e.g., `'{"detect_vertical": true}'`) to pass to `pdfplumber.open(..., laparams=...)`.|
+|`--precision [integer]`| The number of decimal places to round floating-point numbers. Defaults to no rounding.|
 
 ## Python library
 
@@ -72,6 +77,12 @@ The `open` method returns an instance of the `pdfplumber.PDF` class.
 
 To load a password-protected PDF, pass the `password` keyword argument, e.g., `pdfplumber.open("file.pdf", password = "test")`.
 
+To set layout analysis parameters to `pdfminer.six`'s layout engine, pass the `laparams` keyword argument, e.g., `pdfplumber.open("file.pdf", laparams = { "line_overlap": 0.7 })`.
+
+To [pre-normalize Unicode text](https://unicode.org/reports/tr15/), pass `unicode_norm=...`, where `...` is one of the [four Unicode normalization forms](https://unicode.org/reports/tr15/#Normalization_Forms_Table): `"NFC"`, `"NFD"`, `"NFKC"`, or `"NFKD"`.
+
+Invalid metadata values are treated as a warning by default. If that is not intended, pass `strict_metadata=True` to the `open` method and `pdfplumber.open` will raise an exception if it is unable to parse the metadata.
+
 ### The `pdfplumber.PDF` class
 
 The top-level `pdfplumber.PDF` class represents a single PDF and has two main properties:
@@ -80,6 +91,12 @@ The top-level `pdfplumber.PDF` class represents a single PDF and has two main pr
 |----------|-------------|
 |`.metadata`| A dictionary of metadata key/value pairs, drawn from the PDF's `Info` trailers. Typically includes "CreationDate," "ModDate," "Producer," et cetera.|
 |`.pages`| A list containing one `pdfplumber.Page` instance per page loaded.|
+
+... and also has the following method:
+
+| Method | Description |
+|--------|-------------|
+|`.close()`| Calling this method calls `Page.close()` on each page, and also closes the file stream (except in cases when the stream is external, i.e., already opened and passed directly to `pdfplumber`). |
 
 ### The `pdfplumber.Page` class
 
@@ -90,30 +107,38 @@ The `pdfplumber.Page` class is at the core of `pdfplumber`. Most things you'll d
 |`.page_number`| The sequential page number, starting with `1` for the first page, `2` for the second, and so on.|
 |`.width`| The page's width.|
 |`.height`| The page's height.|
-|`.objects` / `.chars` / `.lines` / `.rects` / `.curves` / `.figures` / `.images`| Each of these properties is a list, and each list contains one dictionary for each such object embedded on the page. For more detail, see "[Objects](#objects)" below.|
+|`.objects` / `.chars` / `.lines` / `.rects` / `.curves` / `.images`| Each of these properties is a list, and each list contains one dictionary for each such object embedded on the page. For more detail, see "[Objects](#objects)" below.|
 
 ... and these main methods:
 
 | Method | Description |
 |--------|-------------|
-|`.crop(bounding_box, relative=False)`| Returns a version of the page cropped to the bounding box, which should be expressed as 4-tuple with the values `(x0, top, x1, bottom)`. Cropped pages retain objects that fall at least partly within the bounding box. If an object falls only partly within the box, its dimensions are sliced to fit the bounding box. If `relative=True`, the bounding box is calculated as an offset from the top-left of the page's bounding box, rather than an absolute positioning. (See [Issue #245](https://github.com/jsvine/pdfplumber/issues/245) for a visual example and explanation.)|
-|`.within_bbox(bounding_box, relative=False)`| Similar to `.crop`, but only retains objects that fall *entirely* within the bounding box.|
+|`.crop(bounding_box, relative=False, strict=True)`| Returns a version of the page cropped to the bounding box, which should be expressed as 4-tuple with the values `(x0, top, x1, bottom)`. Cropped pages retain objects that fall at least partly within the bounding box. If an object falls only partly within the box, its dimensions are sliced to fit the bounding box. If `relative=True`, the bounding box is calculated as an offset from the top-left of the page's bounding box, rather than an absolute positioning. (See [Issue #245](https://github.com/jsvine/pdfplumber/issues/245) for a visual example and explanation.) When `strict=True` (the default), the crop's bounding box must fall entirely within the page's bounding box.|
+|`.within_bbox(bounding_box, relative=False, strict=True)`| Similar to `.crop`, but only retains objects that fall *entirely within* the bounding box.|
+|`.outside_bbox(bounding_box, relative=False, strict=True)`| Similar to `.crop` and `.within_bbox`, but only retains objects that fall *entirely outside* the bounding box.|
 |`.filter(test_function)`| Returns a version of the page with only the `.objects` for which `test_function(obj)` returns `True`.|
-|`.extract_text(x_tolerance=3, y_tolerance=3)`| Collates all of the page's character objects into a single string. Adds spaces where the difference between the `x1` of one character and the `x0` of the next is greater than `x_tolerance`. Adds newline characters where the difference between the `doctop` of one character and the `doctop` of the next is greater than `y_tolerance`.|
-|`.extract_words(x_tolerance=3, y_tolerance=3, horizontal_ltr=True, vertical_ttb=True)`| Returns a list of all word-looking things and their bounding boxes. Words are considered to be sequences of characters where (for "upright" characters) the difference between the `x1` of one character and the `x0` of the next is less than or equal to `x_tolerance` *and* where the `doctop` of one character and the `doctop` of the next is less than or equal to `y_tolerance`. A similar approach is taken for non-upright characters, but instead measuring the vertical, rather than horizontal, distances between them. The parameters `horizontal_ltr` and `vertical_ttb` indicate whether the words should be read from left-to-right (for horizontal words) / top-to-bottom (for vertical words).|
-|`.extract_tables(table_settings)`| Extracts tabular data from the page. For more details see "[Extracting tables](#extracting-tables)" below.|
-|`.to_image(**conversion_kwargs)`| Returns an instance of the `PageImage` class. For more details, see "[Visual debugging](#visual-debugging)" below. For conversion_kwargs, see [here](http://docs.wand-py.org/en/latest/wand/image.html#wand.image.Image).|
+
+... and also has the following method:
+
+| Method | Description |
+|--------|-------------|
+|`.close()`| By default, `Page` objects cache their layout and object information to avoid having to reprocess it. When parsing large PDFs, however, these cached properties can require a lot of memory. You can use this method to flush the cache and release the memory.|
+
+Additional methods are described in the sections below:
+
+- [Visual debugging](#visual-debugging)
+- [Extracting text](#extracting-text)
+- [Extracting tables](#extracting-tables)
 
 ### Objects
 
-Each instance of `pdfplumber.PDF` and `pdfplumber.Page` provides access to four types of PDF objects. The following properties each return a Python list of the matching objects:
+Each instance of `pdfplumber.PDF` and `pdfplumber.Page` provides access to several types of PDF objects, all derived from [`pdfminer.six`](https://github.com/pdfminer/pdfminer.six/) PDF parsing. The following properties each return a Python list of the matching objects:
 
 - `.chars`, each representing a single text character.
 - `.lines`, each representing a single 1-dimensional line.
 - `.rects`, each representing a single 2-dimensional rectangle.
-- `.curves`, each representing a series of connected points.
+- `.curves`, each representing any series of connected points that `pdfminer.six` does not recognize as a line or rectangle.
 - `.images`, each representing an image.
-- `.figures`, each representing a figure.
 - `.annots`, each representing a single PDF annotation (cf. Section 8.4 of the [official PDF specification](https://www.adobe.com/content/dam/acom/en/devnet/acrobat/pdfs/pdf_reference_1-7.pdf) for details)
 - `.hyperlinks`, each representing a single PDF annotation of the subtype `Link` and having an `URI` action attribute
 
@@ -138,7 +163,24 @@ Each object is represented as a simple Python `dict`, with the following propert
 |`top`| Distance of top of character from top of page.|
 |`bottom`| Distance of bottom of the character from top of page.|
 |`doctop`| Distance of top of character from top of document.|
+|`matrix`| The "current transformation matrix" for this character. (See below for details.)|
+|`mcid`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section ID for this character if any (otherwise `None`). *Experimental attribute.*|
+|`tag`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section tag for this character if any (otherwise `None`). *Experimental attribute.*|
+|`ncs`|TKTK|
+|`stroking_pattern`|TKTK|
+|`non_stroking_pattern`|TKTK|
+|`stroking_color`|The color of the character's outline (i.e., stroke). See [docs/colors.md](docs/colors.md) for details.|
+|`non_stroking_color`|The character's interior color. See [docs/colors.md](docs/colors.md) for details.|
 |`object_type`| "char"|
+
+__Note__: A character’s `matrix` property represents the “current transformation matrix,” as described in Section 4.2.2 of the [PDF Reference](https://ghostscript.com/~robin/pdf_reference17.pdf) (6th Ed.). The matrix controls the character’s scale, skew, and positional translation. Rotation is a combination of scale and skew, but in most cases can be considered equal to the x-axis skew. The `pdfplumber.ctm` submodule defines a class, `CTM`, that assists with these calculations. For instance:
+
+```python
+from pdfplumber.ctm import CTM
+my_char = pdf.pages[0].chars[3]
+my_char_ctm = CTM(*my_char["matrix"])
+my_char_rotation = my_char_ctm.skew_x
+```
 
 #### `line` properties
 
@@ -155,6 +197,10 @@ Each object is represented as a simple Python `dict`, with the following propert
 |`bottom`| Distance of bottom of the line from top of page.|
 |`doctop`| Distance of top of line from top of document.|
 |`linewidth`| Thickness of line.|
+|`stroking_color`|The color of the line. See [docs/colors.md](docs/colors.md) for details.|
+|`non_stroking_color`|The non-stroking color specified for the line’s path. See [docs/colors.md](docs/colors.md) for details.|
+|`mcid`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section ID for this line if any (otherwise `None`). *Experimental attribute.*|
+|`tag`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section tag for this line if any (otherwise `None`). *Experimental attribute.*|
 |`object_type`| "line"|
 
 #### `rect` properties
@@ -172,6 +218,10 @@ Each object is represented as a simple Python `dict`, with the following propert
 |`bottom`| Distance of bottom of the rectangle from top of page.|
 |`doctop`| Distance of top of rectangle from top of document.|
 |`linewidth`| Thickness of line.|
+|`stroking_color`|The color of the rectangle's outline. See [docs/colors.md](docs/colors.md) for details.|
+|`non_stroking_color`|The rectangle’s fill color. See [docs/colors.md](docs/colors.md) for details.|
+|`mcid`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section ID for this rect if any (otherwise `None`). *Experimental attribute.*|
+|`tag`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section tag for this rect if any (otherwise `None`). *Experimental attribute.*|
 |`object_type`| "rect"|
 
 #### `curve` properties
@@ -179,7 +229,8 @@ Each object is represented as a simple Python `dict`, with the following propert
 | Property | Description |
 |----------|-------------|
 |`page_number`| Page number on which this curve was found.|
-|`points`| Points — as a list of `(x, top)` tuples — describing the curve.|
+|`pts`| A list of `(x, top)` tuples indicating the *points on the curve*.|
+|`path`| A list of `(cmd, *(x, top))` tuples *describing the full path description*, including (for example) control points used in Bezier curves.|
 |`height`| Height of curve's bounding box.|
 |`width`| Width of curve's bounding box.|
 |`x0`| Distance of curve's left-most point from left side of page.|
@@ -190,37 +241,75 @@ Each object is represented as a simple Python `dict`, with the following propert
 |`bottom`| Distance of curve's lowest point from top of page.|
 |`doctop`| Distance of curve's highest point from top of document.|
 |`linewidth`| Thickness of line.|
+|`fill`| Whether the shape defined by the curve's path is filled.|
+|`stroking_color`|The color of the curve's outline. See [docs/colors.md](docs/colors.md) for details.|
+|`non_stroking_color`|The curve’s fill color. See [docs/colors.md](docs/colors.md) for details.|
+|`dash`|A `([dash_array], dash_phase)` tuple describing the curve's dash style. See [Table 4.6 of the PDF specification](https://ghostscript.com/~robin/pdf_reference17.pdf#page=218) for details.|
+|`mcid`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section ID for this curve if any (otherwise `None`). *Experimental attribute.*|
+|`tag`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section tag for this curve if any (otherwise `None`). *Experimental attribute.*|
 |`object_type`| "curve"|
 
-Additionally, both `pdfplumber.PDF` and `pdfplumber.Page` provide access to two derived lists of objects: `.rect_edges` (which decomposes each rectangle into its four lines) and `.edges` (which combines `.rect_edges` with `.lines`). 
+#### Derived properties
+
+Additionally, both `pdfplumber.PDF` and `pdfplumber.Page` provide access to several derived lists of objects: `.rect_edges` (which decomposes each rectangle into its four lines), `.curve_edges` (which does the same for `curve` objects), and `.edges` (which combines `.rect_edges`, `.curve_edges`, and `.lines`). 
 
 #### `image` properties
 
-[To be completed.]
+*Note: Although the positioning and characteristics of `image` objects are available via `pdfplumber`, this library does not provide direct support for reconstructing image content. For that, please see [this suggestion](https://github.com/jsvine/pdfplumber/discussions/496#discussioncomment-1259772).*
 
-#### `figure` properties
+| Property | Description |
+|----------|-------------|
+|`page_number`| Page number on which the image was found.|
+|`height`| Height of the image.|
+|`width`| Width of the image.|
+|`x0`| Distance of left side of the image from left side of page.|
+|`x1`| Distance of right side of the image from left side of page.|
+|`y0`| Distance of bottom of the image from bottom of page.|
+|`y1`| Distance of top of the image from bottom of page.|
+|`top`| Distance of top of the image from top of page.|
+|`bottom`| Distance of bottom of the image from top of page.|
+|`doctop`| Distance of top of rectangle from top of document.|
+|`srcsize`| The image original dimensions, as a `(width, height)` tuple.|
+|`colorspace`| Color domain of the image (e.g., RGB).|
+|`bits`| The number of bits per color component; e.g., 8 corresponds to 255 possible values for each color component (R, G, and B in an RGB color space).|
+|`stream`| Pixel values of the image, as a `pdfminer.pdftypes.PDFStream` object.|
+|`imagemask`| A nullable boolean; if `True`, "specifies that the image data is to be used as a stencil mask for painting in the current color."|
+|`name`| "The name by which this image XObject is referenced in the XObject subdictionary of the current resource dictionary." [🔗](https://ghostscript.com/~robin/pdf_reference17.pdf#page=340) |
+|`mcid`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section ID for this image if any (otherwise `None`). *Experimental attribute.*|
+|`tag`| The [marked content](https://ghostscript.com/~robin/pdf_reference17.pdf#page=850) section tag for this image if any (otherwise `None`). *Experimental attribute.*|
+|`object_type`| "image"|
 
-[To be completed.]
+### Obtaining higher-level layout objects via `pdfminer.six`
+
+If you pass the `pdfminer.six`-handling `laparams` parameter to `pdfplumber.open(...)`, then each page's `.objects` dictionary will also contain `pdfminer.six`'s higher-level layout objects, such as `"textboxhorizontal"`.
+
 
 ## Visual debugging
 
-__Note:__ To use `pdfplumber`'s visual-debugging tools, you'll also need to have two additional pieces of software installed on your computer:
-
-- [`ImageMagick`](https://www.imagemagick.org/). [Installation instructions here](http://docs.wand-py.org/en/latest/guide/install.html#install-imagemagick-debian).
-- [`ghostscript`](https://www.ghostscript.com). [Installation instructions here](https://www.ghostscript.com/doc/9.21/Install.htm), or simply `apt install ghostscript` (Ubuntu) / `brew install ghostscript` (Mac).
+`pdfplumber`'s visual debugging tools can be helpful in understanding the structure of a PDF and the objects that have been extracted from it.
 
 
 ### Creating a `PageImage` with `.to_image()`
 
-To turn any page (including cropped pages) into an `PageImage` object, call `my_page.to_image()`. You can optionally pass a `resolution={integer}` keyword argument, which defaults to 72. E.g.:
+To turn any page (including cropped pages) into an `PageImage` object, call `my_page.to_image()`. You can optionally pass *one* of the  following keyword arguments:
+
+- `resolution`: The desired number pixels per inch. Default: `72`. Type: `int`.
+- `width`: The desired image width in pixels. Default: unset, determined by `resolution`. Type: `int`.
+- `height`: The desired image width in pixels. Default: unset, determined by `resolution`. Type: `int`.
+- `antialias`: Whether to use antialiasing when creating the image. Setting to `True` creates images with less-jagged text and graphics, but with larger file sizes. Default: `False`. Type: `bool`.
+- `force_mediabox`: Use the page's `.mediabox` dimensions, rather than the `.cropbox` dimensions. Default: `False`. Type: `bool`.
+
+For instance:
 
 ```python
 im = my_pdf.pages[0].to_image(resolution=150)
 ```
 
-`PageImage` objects play nicely with IPython/Jupyter notebooks; they automatically render as cell outputs. For example:
+From a script or REPL, `im.show()` will open the image in your local image viewer. But `PageImage` objects also play nicely with Jupyter notebooks; they automatically render as cell outputs. For example:
 
 ![Visual debugging in Jupyter](examples/screenshots/visual-debugging-in-jupyter.png "Visual debugging in Jupyter")
+
+*Note*: `.to_image(...)` works as expected with `Page.crop(...)`/`CroppedPage` instances, but is unable to incorporate changes made via `Page.filter(...)`/`FilteredPage` instances.
 
 
 ### Basic `PageImage` methods
@@ -229,7 +318,8 @@ im = my_pdf.pages[0].to_image(resolution=150)
 |--------|-------------|
 |`im.reset()`| Clears anything you've drawn so far.|
 |`im.copy()`| Copies the image to a new `PageImage` object.|
-|`im.save(path_or_fileobject, format="PNG")`| Saves the annotated image.|
+|`im.show()`| Opens the image in your local image viewer.|
+|`im.save(path_or_fileobject, format="PNG", quantize=True, colors=256, bits=8)`| Saves the annotated image as a PNG file. The default arguments quantize the image to a palette of 256 colors, saving the PNG with 8-bit color depth. You can disable quantization by passing `quantize=False` or adjust the size of the color palette by passing `colors=N`.|
 
 ### Drawing methods
 
@@ -245,25 +335,27 @@ You can pass explicit coordinates or any `pdfplumber` PDF object (e.g., char, li
 
 Note: The methods above are built on Pillow's [`ImageDraw` methods](http://pillow.readthedocs.io/en/latest/reference/ImageDraw.html), but the parameters have been tweaked for consistency with SVG's `fill`/`stroke`/`stroke_width` nomenclature.
 
-### Troubleshooting ImageMagick on Debian-based systems
+### Visually debugging the table-finder
 
-If you're using `pdfplumber` on a Debian-based system and encounter a `PolicyError`, you may be able to fix it by changing the following line in `/etc/ImageMagick-6/policy.xml` from this:
+`im.debug_tablefinder(table_settings={})` will return a version of the PageImage with the detected lines (in red), intersections (circles), and tables (light blue) overlaid.
 
-```xml
-<policy domain="coder" rights="none" pattern="PDF" />
-```
+## Extracting text
 
-... to this:
+`pdfplumber` can extract text from any given page (including cropped and derived pages). It can also attempt to preserve the layout of that text, as well as to identify the coordinates of words and search queries. `Page` objects can call the following text-extraction methods:
 
-```xml
-<policy domain="coder" rights="read|write" pattern="PDF" />
-```
 
-(More details about `policy.xml` [available here](https://imagemagick.org/script/security-policy.php).)
+| Method | Description |
+|--------|-------------|
+|`.extract_text(x_tolerance=3, x_tolerance_ratio=None, y_tolerance=3, layout=False, x_density=7.25, y_density=13, line_dir_render=None, char_dir_render=None, **kwargs)`| Collates all of the page's character objects into a single string.<ul><li><p>When `layout=False`: Adds spaces where the difference between the `x1` of one character and the `x0` of the next is greater than `x_tolerance`. (If `x_tolerance_ratio` is not `None`, the extractor uses a dynamic `x_tolerance` equal to `x_tolerance_ratio * previous_character["size"]`.) Adds newline characters where the difference between the `doctop` of one character and the `doctop` of the next is greater than `y_tolerance`.</p></li><li><p>When `layout=True` (*experimental feature*): Attempts to mimic the structural layout of the text on the page(s), using `x_density` and `y_density` to determine the minimum number of characters/newlines per "point," the PDF unit of measurement. Passing `line_dir_render="ttb"/"btt"/"ltr"/"rtl"` and/or `char_dir_render="ttb"/"btt"/"ltr"/"rtl"` will output the the lines/characters in a different direction than the default. All remaining `**kwargs` are passed to `.extract_words(...)` (see below), the first step in calculating the layout.</p></li></ul>|
+|`.extract_text_simple(x_tolerance=3, y_tolerance=3)`| A slightly faster but less flexible version of `.extract_text(...)`, using a simpler logic.|
+|`.extract_words(x_tolerance=3, x_tolerance_ratio=None, y_tolerance=3, keep_blank_chars=False, use_text_flow=False, line_dir="ttb", char_dir="ltr", line_dir_rotated="ttb", char_dir_rotated="ltr", extra_attrs=[], split_at_punctuation=False, expand_ligatures=True, return_chars=False)`| Returns a list of all word-looking things and their bounding boxes. Words are considered to be sequences of characters where (for "upright" characters) the difference between the `x1` of one character and the `x0` of the next is less than or equal to `x_tolerance` *and* where the `doctop` of one character and the `doctop` of the next is less than or equal to `y_tolerance`. (If `x_tolerance_ratio` is not `None`, the extractor uses a dynamic `x_tolerance` equal to `x_tolerance_ratio * previous_character["size"]`.) A similar approach is taken for non-upright characters, but instead measuring the vertical, rather than horizontal, distances between them. Changing `keep_blank_chars` to `True` will mean that blank characters are treated as part of a word, not as a space between words. Changing `use_text_flow` to `True` will use the PDF's underlying flow of characters as a guide for ordering and segmenting the words, rather than presorting the characters by x/y position. (This mimics how dragging a cursor highlights text in a PDF; as with that, the order does not always appear to be logical.) The arguments `line_dir` and `char_dir` tell this method the direction in which lines/characters are expected to be read; valid options are "ttb" (top-to-bottom), "btt" (bottom-to-top), "ltr" (left-to-right), and "rtl" (right-to-left). The `line_dir_rotated` and `char_dir_rotated` arguments are similar, but for text that has been rotated. Passing a list of `extra_attrs`  (e.g., `["fontname", "size"]` will restrict each words to characters that share exactly the same value for each of those [attributes](#char-properties), and the resulting word dicts will indicate those attributes. Setting `split_at_punctuation` to `True` will enforce breaking tokens at punctuations specified by `string.punctuation`; or you can specify the list of separating punctuation by pass a string, e.g., <code>split_at_punctuation='!"&\'()*+,.:;<=>?@[\]^\`\{\|\}~'</code>. Unless you set `expand_ligatures=False`, ligatures such as `ﬁ` will be expanded into their constituent letters (e.g., `fi`). Passing `return_chars=True` will add, to each word dictionary, a list of its constituent characters, as a list in the `"chars"` field.|
+|`.extract_text_lines(layout=False, strip=True, return_chars=True, **kwargs)`|*Experimental feature* that returns a list of dictionaries representing the lines of text on the page. The `strip` parameter works analogously to Python's `str.strip()` method, and returns `text` attributes without their surrounding whitespace. (Only relevant when `layout = True`.) Setting `return_chars` to `False` will exclude the individual character objects from the returned text-line dicts. The remaining `**kwargs` are those you would pass to `.extract_text(layout=True, ...)`.|
+|`.search(pattern, regex=True, case=True, main_group=0, return_groups=True, return_chars=True, layout=False, **kwargs)`|*Experimental feature* that allows you to search a page's text, returning a list of all instances that match the query. For each instance, the response dictionary object contains the matching text, any regex group matches, the bounding box coordinates, and the char objects themselves. `pattern` can be a compiled regular expression, an uncompiled regular expression, or a non-regex string. If `regex` is `False`, the pattern is treated as a non-regex string. If `case` is `False`, the search is performed in a case-insensitive manner. Setting `main_group` restricts the results to a specific regex group within the `pattern` (default of `0` means the entire match). Setting `return_groups` and/or `return_chars` to `False` will exclude the lists of the matched regex groups and/or characters from being added (as `"groups"` and `"chars"` to the return dicts). The `layout` parameter operates as it does for `.extract_text(...)`. The remaining `**kwargs` are those you would pass to `.extract_text(layout=True, ...)`. __Note__: Zero-width and all-whitespace matches are discarded, because they (generally) have no explicit position on the page. |
+|`.dedupe_chars(tolerance=1, extra_attrs=("fontname", "size"))`| Returns a version of the page with duplicate chars — those sharing the same text, positioning (within `tolerance` x/y), and `extra_attrs` as other characters — removed. (See [Issue #71](https://github.com/jsvine/pdfplumber/issues/71) to understand the motivation.)|
 
 ## Extracting tables
 
-`pdfplumber`'s approach to table detection borrows heavily from [Anssi Nurminen's master's thesis](http://dspace.cc.tut.fi/dpub/bitstream/handle/123456789/21520/Nurminen.pdf?sequence=3), and is inspired by [Tabula](https://github.com/tabulapdf/tabula-extractor/issues/16). It works like this:
+`pdfplumber`'s approach to table detection borrows heavily from [Anssi Nurminen's master's thesis](https://trepo.tuni.fi/bitstream/handle/123456789/21520/Nurminen.pdf?sequence=3), and is inspired by [Tabula](https://github.com/tabulapdf/tabula-extractor/issues/16). It works like this:
 
 1. For any given PDF page, find the lines that are (a) explicitly defined and/or (b) implied by the alignment of words on the page.
 2. Merge overlapping, or nearly-overlapping, lines.
@@ -277,9 +369,11 @@ If you're using `pdfplumber` on a Debian-based system and encounter a `PolicyErr
 
 | Method | Description |
 |--------|-------------|
+|`.find_tables(table_settings={})`|Returns a list of `Table` objects. The `Table` object provides access to the `.cells`, `.rows`, `.columns`, and `.bbox` properties, as well as the `.extract(x_tolerance=3, y_tolerance=3)` method.|
+|`.find_table(table_settings={})`|Similar to `.find_tables(...)`, but returns the *largest* table on the page, as a `Table` object. If multiple tables have the same size — as measured by the number of cells — this method returns the table closest to the top of the page.|
 |`.find_tables(table_settings={})`|Returns a list of `Table` objects. The `Table` object provides access to the `.cells`, `.rows`, and `.bbox` properties, as well as the `.extract(x_tolerance=3, y_tolerance=3, strip_whitespaces=True)` method.|
 |`.extract_tables(table_settings={})`|Returns the text extracted from *all* tables found on the page, represented as a list of lists of lists, with the structure `table -> row -> cell`.|
-|`.extract_table(table_settings={})`|Returns the text extracted from the *largest* table on the page, represented as a list of lists, with the structure `row -> cell`. (If multiple tables have the same size — as measured by the number of cells — this method returns the table closest to the top of the page.)|
+|`.extract_table(table_settings={})`|Returns the text extracted from the *largest* table on the page (see `.find_table(...)` above), represented as a list of lists, with the structure `row -> cell`.|
 |`.debug_tablefinder(table_settings={})`|Returns an instance of the `TableFinder` class, with access to the `.edges`, `.intersections`, `.cells`, and `.tables` properties.|
 
 For example:
@@ -303,15 +397,21 @@ By default, `extract_tables` uses the page's vertical and horizontal lines (or r
     "explicit_vertical_lines": [],
     "explicit_horizontal_lines": [],
     "snap_tolerance": 3,
+    "snap_x_tolerance": 3,
+    "snap_y_tolerance": 3,
     "join_tolerance": 3,
+    "join_x_tolerance": 3,
+    "join_y_tolerance": 3,
     "edge_min_length": 3,
     "min_words_vertical": 3,
     "min_words_horizontal": 1,
-    "keep_blank_chars": False,
-    "text_tolerance": 3,
-    "text_x_tolerance": None,
-    "text_y_tolerance": None,
     "intersection_tolerance": 3,
+    "intersection_x_tolerance": 3,
+    "intersection_y_tolerance": 3,
+    "text_tolerance": 3,
+    "text_x_tolerance": 3,
+    "text_y_tolerance": 3,
+    "text_*": …, # See below
     "intersection_x_tolerance": None,
     "intersection_y_tolerance": None,
     "strip_whitespaces": True,
@@ -324,11 +424,14 @@ By default, `extract_tables` uses the page's vertical and horizontal lines (or r
 |`"horizontal_strategy"`| Either `"lines"`, `"lines_strict"`, `"text"`, or `"explicit"`. See explanation below.|
 |`"explicit_vertical_lines"`| A list of vertical lines that explicitly demarcate cells in the table. Can be used in combination with any of the strategies above. Items in the list should be either numbers — indicating the `x` coordinate of a line the full height of the page — or `line`/`rect`/`curve` objects.|
 |`"explicit_horizontal_lines"`| A list of horizontal lines that explicitly demarcate cells in the table. Can be used in combination with any of the strategies above. Items in the list should be either numbers — indicating the `y` coordinate of a line the full height of the page — or `line`/`rect`/`curve` objects.|
-|`"snap_tolerance"`| Parallel lines within `snap_tolerance` pixels will be "snapped" to the same horizontal or vertical position.|
-|`"join_tolerance"`| Line segments on the same infinite line, and whose ends are within `join_tolerance` of one another, will be "joined" into a single line segment.|
+|`"snap_tolerance"`, `"snap_x_tolerance"`, `"snap_y_tolerance"`| Parallel lines within `snap_tolerance` points will be "snapped" to the same horizontal or vertical position.|
+|`"join_tolerance"`, `"join_x_tolerance"`, `"join_y_tolerance"`| Line segments on the same infinite line, and whose ends are within `join_tolerance` of one another, will be "joined" into a single line segment.|
 |`"edge_min_length"`| Edges shorter than `edge_min_length` will be discarded before attempting to reconstruct the table.|
 |`"min_words_vertical"`| When using `"vertical_strategy": "text"`, at least `min_words_vertical` words must share the same alignment.|
 |`"min_words_horizontal"`| When using `"horizontal_strategy": "text"`, at least `min_words_horizontal` words must share the same alignment.|
+|`"intersection_tolerance"`, `"intersection_x_tolerance"`, `"intersection_y_tolerance"`| When combining edges into cells, orthogonal edges must be within `intersection_tolerance` points to be considered intersecting.|
+|`"text_*"`| All settings prefixed with `text_` are then used when extracting text from each discovered table. All possible arguments to `Page.extract_text(...)` are also valid here.|
+|`"text_x_tolerance"`, `"text_y_tolerance"`| These `text_`-prefixed settings *also* apply to the table-identification algorithm when the `text` strategy is used. I.e., when that algorithm searches for words, it will expect the individual letters in each word to be no more than `text_x_tolerance`/`text_y_tolerance` points apart.|
 |`"keep_blank_chars"`| When using the `text` strategy, consider `" "` chars to be *parts* of words and not word-separators.|
 |`"text_tolerance"`, `"text_x_tolerance"`, `"text_y_tolerance"`| When the `text` strategy searches for words, it will expect the individual letters in each word to be no more than `text_tolerance` pixels apart.|
 |`"intersection_tolerance"`, `"intersection_x_tolerance"`, `"intersection_y_tolerance"`| When combining edges into cells, orthogonal edges must be within `intersection_tolerance` pixels to be considered intersecting.|
@@ -354,25 +457,54 @@ Both `vertical_strategy` and `horizontal_strategy` accept the following options:
 
 ## Extracting form values
 
-Sometimes PDF files can contain forms that include inputs that people can fill out and save. While values in form fields appear like other text in a PDF file, form data is handled differently. If you want the gory details, see page 671 of this [specification](https://www.adobe.com/content/dam/acom/en/devnet/pdf/pdf_reference_archive/pdf_reference_1-7.pdf).
+Sometimes PDF files can contain forms that include inputs that people can fill out and save. While values in form fields appear like other text in a PDF file, form data is handled differently. If you want the gory details, see page 671 of this [specification](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/pdfreference1.7old.pdf).
 
 `pdfplumber` doesn't have an interface for working with form data, but you can access it using `pdfplumber`'s wrappers around `pdfminer`.
 
-For example, this snippet will retrieve form field names and values and store them in a dictionary. You may have to modify this script to handle cases like nested fields (see page 676 of the specification).
+For example, this snippet will retrieve form field names and values and store them in a dictionary.
 
 ```python
+import pdfplumber
+from pdfplumber.utils.pdfinternals import resolve_and_decode, resolve
+
 pdf = pdfplumber.open("document_with_form.pdf")
 
-fields = pdf.doc.catalog["AcroForm"].resolve()["Fields"]
+def parse_field_helper(form_data, field, prefix=None):
+    """ appends any PDF AcroForm field/value pairs in `field` to provided `form_data` list
 
-form_data = {}
+        if `field` has child fields, those will be parsed recursively.
+    """
+    resolved_field = field.resolve()
+    field_name = '.'.join(filter(lambda x: x, [prefix, resolve_and_decode(resolved_field.get("T"))]))
+    if "Kids" in resolved_field:
+        for kid_field in resolved_field["Kids"]:
+            parse_field_helper(form_data, kid_field, prefix=field_name)
+    if "T" in resolved_field or "TU" in resolved_field:
+        # "T" is a field-name, but it's sometimes absent.
+        # "TU" is the "alternate field name" and is often more human-readable
+        # your PDF may have one, the other, or both.
+        alternate_field_name  = resolve_and_decode(resolved_field.get("TU")) if resolved_field.get("TU") else None
+        field_value = resolve_and_decode(resolved_field["V"]) if 'V' in resolved_field else None
+        form_data.append([field_name, alternate_field_name, field_value])
 
+
+form_data = []
+fields = resolve(resolve(pdf.doc.catalog["AcroForm"])["Fields"])
 for field in fields:
-    field_name = field.resolve()["T"]
-    field_value = field.resolve()["V"]
-    form_data[field_name] = field_value
+    parse_field_helper(form_data, field)
 ```
 
+Once you run this script, `form_data` is a list containing a three-element tuple for each form element. For instance, a PDF form with a city and state field might look like this.
+```
+[
+ ['STATE.0', 'enter STATE', 'CA'],
+ ['section 2  accident infoRmation.1.0',
+  'enter city of accident',
+  'SAN FRANCISCO']
+]
+```
+
+*Thanks to [@jeremybmerrill](https://github.com/jeremybmerrill) for helping to maintain the form-parsing code above.*
 
 ## Demonstrations
 
@@ -401,11 +533,12 @@ It's also helpful to know what features `pdfplumber` does __not__ provide:
 
 - [`pdfminer.six`](https://github.com/pdfminer/pdfminer.six) provides the foundation for `pdfplumber`. It primarily focuses on parsing PDFs, analyzing PDF layouts and object positioning, and extracting text. It does not provide tools for table extraction or visual debugging.
 
+- [`PyPDF2`](https://github.com/mstamy2/PyPDF2) is a pure-Python library "capable of splitting, merging, cropping, and transforming the pages of PDF files. It can also add custom data, viewing options, and passwords to PDF files." It can extract page text, but does not provide easy access to shape objects (rectangles, lines, etc.), table-extraction, or visually debugging tools.
+
 - [`pymupdf`](https://pymupdf.readthedocs.io/) is substantially faster than `pdfminer.six` (and thus also `pdfplumber`) and can generate and modify PDFs, but the library requires installation of non-Python software (MuPDF). It also does not enable easy access to shape objects (rectangles, lines, etc.), and does not provide table-extraction or visual debugging tools.
 
 - [`camelot`](https://github.com/camelot-dev/camelot), [`tabula-py`](https://github.com/chezou/tabula-py), and [`pdftables`](https://github.com/drj11/pdftables) all focus primarily on extracting tables. In some cases, they may be better suited to the particular tables you are trying to extract.
 
-- [`PyPDF2`](https://github.com/mstamy2/PyPDF2) and its successor libraries appear no longer to be maintained.
 
 ## Acknowledgments / Contributors
 
@@ -424,6 +557,28 @@ Many thanks to the following users who've contributed ideas, features, and fixes
 - [Kwok-kuen Cheung](https://github.com/cheungpat)
 - [Marco](https://github.com/ubmarco)
 - [Idan David](https://github.com/idan-david)
+- [@xv44586](https://github.com/xv44586)
+- [Alexander Regueiro](https://github.com/alexreg)
+- [Daniel Peña](https://github.com/trifling)
+- [@bobluda](https://github.com/bobluda)
+- [@ramcdona](https://github.com/ramcdona)
+- [@johnhuge](https://github.com/johnhuge)
+- [Jhonatan Lopes](https://github.com/jhonatan-lopes)
+- [Ethan Corey](https://github.com/ethanscorey)
+- [Shannon Shen](https://github.com/lolipopshock)
+- [Matsumoto Toshi](https://github.com/toshi1127)
+- [John West](https://github.com/jwestwsj)
+- [David Huggins-Daines](https://github.com/dhdaines)
+- [Jeremy B. Merrill](https://github.com/jeremybmerrill)
+- [Echedey Luis](https://github.com/echedey-ls)
+- [Andy Friedman](https://github.com/afriedman412)
+- [Aron Weiler](https://github.com/aronweiler)
+- [Quentin André](https://github.com/QuentinAndre11)
+- [Léo Roux](https://github.com/leorouxx)
+- [@wodny](https://github.com/wodny)
+- [Michal Stolarczyk](https://github.com/stolarczyk)
+- [Brandon Roberts](https://github.com/brandonrobertz)
+- [@ennamarie19](https://github.com/ennamarie19)
 
 ## Contributing
 
