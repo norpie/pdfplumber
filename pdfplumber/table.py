@@ -450,7 +450,12 @@ class Table(object):
                             kwargs["layout_width"] = cell[2] - cell[0]
                             kwargs["layout_height"] = cell[3] - cell[1]
                             kwargs["layout_bbox"] = cell
-                        # Pass only preserve_spaces to extract_text
+                    
+                        # When preserve_spaces is True, also set layout=True to better preserve spacing
+                        if preserve_spaces and "layout" not in kwargs:
+                            kwargs["layout"] = True
+                    
+                        # Pass preserve_spaces to extract_text and ensure it's honored
                         cell_text = utils.extract_text(
                             cell_chars, 
                             preserve_spaces=preserve_spaces,

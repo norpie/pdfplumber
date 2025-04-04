@@ -223,7 +223,8 @@ class TextMap:
         if strip:
             pat = r" *([^\n]+?) *(\n|$)"
         else:
-            pat = r"([^\n]+)"
+            # Modified pattern to capture all content including leading/trailing spaces
+            pat = r"([^\n]*)"
 
         return self.search(
             pat, main_group=1, return_chars=return_chars, return_groups=False
