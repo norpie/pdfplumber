@@ -422,9 +422,14 @@ class Table(object):
         # Get strip_whitespaces value and remove it from kwargs so it's not passed twice
         strip_whitespaces = kwargs.pop("strip_whitespaces", True)
         
-        # Get preserve_spaces parameter (default False unless strip_whitespaces is False)
-        # This makes preserve_spaces the inverse of strip_whitespaces by default
-        preserve_spaces = kwargs.pop("preserve_spaces", not strip_whitespaces)
+        # Get preserve_spaces parameter - now defaults to False independent of strip_whitespaces
+        # This allows more granular control
+        preserve_spaces = kwargs.pop("preserve_spaces", False)
+        
+        # If explicitly setting preserve_spaces to True, make sure strip_whitespaces
+        # doesn't interfere with preserving leading/trailing whitespace
+        if preserve_spaces:
+            strip_whitespaces = False
         
         chars = self.page.chars
         table_arr = []

@@ -439,7 +439,7 @@ class WordExtractor:
         split_at_punctuation: Union[bool, str] = False,
         expand_ligatures: bool = True,
         strip_whitespaces: bool = True,
-        preserve_spaces: bool = False,  # Add parameter to control space preservation
+        preserve_spaces: bool = False,
     ):
         self.x_tolerance = x_tolerance
         self.y_tolerance = y_tolerance
@@ -501,8 +501,9 @@ class WordExtractor:
             self.expansions.get(c["text"], c["text"]) for c in ordered_chars
         )
         
-        # Apply stripping if requested
-        if self.strip_whitespaces:
+        # Only strip if preserve_spaces is False
+        # This ensures we don't strip leading/trailing spaces when preserve_spaces is True
+        if self.strip_whitespaces and not self.preserve_spaces:
             word_text = word_text.strip()
 
         word = {
@@ -735,7 +736,7 @@ def extract_text(
     line_dir_render: Optional[T_dir] = None,
     char_dir_render: Optional[T_dir] = None,
     strip_whitespaces: bool = True,
-    preserve_spaces: bool = False,  # Add parameter to control space preservation
+    preserve_spaces: bool = False,
     **kwargs: Any,
 ) -> str:
     chars = to_list(chars)
@@ -811,6 +812,11 @@ def extract_text(
             line_dir_render=line_dir_render,
             char_dir_render=char_dir_render,
         ).as_string
+    
+    # Do final stripping only if preserve_spaces is False and strip_whitespaces is True
+    # This ensures we don't strip leading/trailing spaces at the text level
+    if strip_whitespaces and not preserve_spaces:
+        result = result.strip()
     
     return result
 
