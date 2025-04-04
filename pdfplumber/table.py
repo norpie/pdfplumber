@@ -419,9 +419,9 @@ class Table(object):
         return self._get_rows_or_cols(Column)
 
     def extract(self, **kwargs: Any) -> List[List[Optional[str]]]:
-        # Set default for strip_whitespaces if not provided
+        # Get strip_whitespaces value and remove it from kwargs so it's not passed twice
         strip_whitespaces = kwargs.pop("strip_whitespaces", True)
-
+        
         chars = self.page.chars
         table_arr = []
 
@@ -450,11 +450,13 @@ class Table(object):
                             kwargs["layout_width"] = cell[2] - cell[0]
                             kwargs["layout_height"] = cell[3] - cell[1]
                             kwargs["layout_bbox"] = cell
-                        cell_text = utils.extract_text(cell_chars, **kwargs)
-                        
-                        # Strip whitespace if requested
-                        if strip_whitespaces:
-                            cell_text = cell_text.strip()
+                        # Pass strip_whitespaces to extract_text
+                        cell_text = utils.extract_text(
+                            cell_chars, 
+                            strip_whitespaces=strip_whitespaces,
+                            **kwargs
+                        )
+                        # No need for explicit stripping here as it's now handled by extract_text/WordExtractor
                     else:
                         cell_text = ""
                 arr.append(cell_text)

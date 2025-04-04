@@ -438,6 +438,7 @@ class WordExtractor:
         extra_attrs: Optional[List[str]] = None,
         split_at_punctuation: Union[bool, str] = False,
         expand_ligatures: bool = True,
+        strip_whitespaces: bool = True,  # Add strip_whitespaces parameter
     ):
         self.x_tolerance = x_tolerance
         self.y_tolerance = y_tolerance
@@ -474,6 +475,7 @@ class WordExtractor:
         )
 
         self.expansions = LIGATURES if expand_ligatures else {}
+        self.strip_whitespaces = strip_whitespaces
 
     def get_char_dir(self, upright: int) -> T_dir:
         # Note: This can be simplified and reincorporated into .merge_chars and
@@ -493,10 +495,16 @@ class WordExtractor:
         upright = ordered_chars[0]["upright"]
         char_dir = self.get_char_dir(upright)
 
+        word_text = "".join(
+            self.expansions.get(c["text"], c["text"]) for c in ordered_chars
+        )
+        
+        # Apply stripping if requested
+        if self.strip_whitespaces:
+            word_text = word_text.strip()
+
         word = {
-            "text": "".join(
-                self.expansions.get(c["text"], c["text"]) for c in ordered_chars
-            ),
+            "text": word_text,
             "x0": x0,
             "x1": x1,
             "top": top,
@@ -724,12 +732,16 @@ def extract_text(
     chars: T_obj_list,
     line_dir_render: Optional[T_dir] = None,
     char_dir_render: Optional[T_dir] = None,
-    strip_whitespaces: bool = True,  # Adding the strip_whitespaces parameter
+    strip_whitespaces: bool = True,
     **kwargs: Any,
 ) -> str:
     chars = to_list(chars)
     if len(chars) == 0:
         return ""
+
+    # Always include strip_whitespaces in kwargs to pass to WordExtractor
+    if "strip_whitespaces" not in kwargs:
+        kwargs["strip_whitespaces"] = strip_whitespaces
 
     if kwargs.get("layout"):
         textmap_kwargs = {
@@ -767,11 +779,7 @@ def extract_text(
             line_dir_render=line_dir_render,
             char_dir_render=char_dir_render,
         ).as_string
-        
-    # Apply stripping if requested
-    if strip_whitespaces:
-        result = result.strip()
-        
+    
     return result
 
 
